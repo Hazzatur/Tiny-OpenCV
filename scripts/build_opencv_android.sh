@@ -149,6 +149,17 @@ for ABI in "${ABIS[@]}"; do
     > "$BDIR/configure.log" 2>&1 || { tail -40 "$BDIR/configure.log"; die "configure failed for $ABI"; }
   sanitize_build_info "$BDIR"
 
+  # OpenCV silently drops a HAL whose download fails, which would change the binary without
+  # any error. Require the HAL set the 4.11.0 legacy binaries were built with.
+  case "$ABI" in
+    armeabi-v7a) EXPECTED_HAL="YES (carotene (ver 0.0.1))" ;;
+    arm64-v8a)   EXPECTED_HAL="YES (carotene (ver 0.0.1) KleidiCV (ver 0.3.0))" ;;
+    *)           EXPECTED_HAL="NO" ;;
+  esac
+  ACTUAL_HAL="$(sed -n 's/^-- *Custom HAL: *//p' "$BDIR/configure.log" | sed 's/ *$//')"
+  [[ "$ACTUAL_HAL" == "$EXPECTED_HAL" ]] \
+    || die "$ABI: Custom HAL is '$ACTUAL_HAL', expected '$EXPECTED_HAL' (failed HAL download?)"
+
   echo ">>> building $ABI"
   start=$(date +%s)
   # Only the native library and the assembled Java sources. The default "all" target also
