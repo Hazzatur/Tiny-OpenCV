@@ -1,109 +1,74 @@
-# Building OpenCV Android SDK with NDK 28 for API Level 26
+# Building the native library from source
 
-This guide shows you how to build the OpenCV Android SDK (version 4.11.0) using NDK 28 for API level 26. The build produces a unified shared library **libopencv_java4.so** that contains the Java bindings along with only the **core**, **imgproc**, and **java** modules.
+`libopencv_java4.so` is not checked into this repository. It is built from
+OpenCV's source by two scripts:
 
----
+| Script | Purpose |
+|---|---|
+| `scripts/jitpack_prepare.sh` | Downloads the pinned toolchain and OpenCV source, verifies every download by sha256, builds all four ABIs into `openCV/src/main/jniLibs`, then optionally runs Gradle tasks. JitPack uses this script, and it is the easiest way to build locally. |
+| `scripts/build_opencv_android.sh` | The build itself. It works with a toolchain you provide. |
 
-## 1. Clone the Repository and Create a Build Directory
+## Quick start (Linux x86_64)
 
-Open your terminal and run:
-
-```bash
-git clone git@github.com:opencv/opencv.git -b 4.11.0
-cd opencv
-mkdir build
-cd build
-```
-
----
-
-## 2. Set Environment Variables
-
-Adjust the following variables to match your local setup. In this example, we’re building for **x86_64** targeting API level **26**. (For other ABIs, set **TARGET_ABI** accordingly.)
+Requirements: `bash`, `curl`, `git`, `unzip`, `tar`, `sha256sum` and a JDK 17.
 
 ```bash
-export OPENCV_SRC_FOLDER=~/Personal/opencv
-export OPENCV_BUILD_FOLDER=$OPENCV_SRC_FOLDER/build
-export ANDROID_SDK=~/Android/Sdk
-export ANDROID_NDK_HOME=$ANDROID_SDK/ndk/28.0.12916984
-export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
-export TARGET_ABI=x86_64 # armeabi-v7a, arm64-v8a, x86, x86_64
-export API_LEVEL=26
+# Build the four ABIs, then assemble and install the AAR to ~/.m2
+scripts/jitpack_prepare.sh :openCV:publishToMavenLocal
 ```
 
----
+The toolchain is cached in `~/.cache/tiny-opencv-native`. Set `WORK` to use
+another directory. The first run downloads about 1 GB, mostly the NDK. After
+that, a full build takes a few minutes.
 
-## 3. Configure the Build with CMake
+## What gets built
 
-Run the following CMake command. This command:
-- Uses the NDK’s toolchain file.
-- Sets the ABI and API level.
-- Uses the static C++ runtime.
-- Enables the unified Java library target (**BUILD_opencv_java=ON**).
-- Disables tests, performance tests, examples, and Android projects.
-- Limits the build to the **core**, **imgproc**, and **java** modules.
-- Uses shared libraries overall (so the Java target is built as a shared library) with optimization flags.
-- Disables third-party dependencies like IPP, TBB, CUDA, and OpenCL.
+- OpenCV **4.11.0** (commit `31b0eeea0b44b370fd0712312df4214d4ae1b158`) with
+  `BUILD_LIST=core,imgproc,java,java_bindings_generator`
+- ABIs `armeabi-v7a`, `arm64-v8a`, `x86` and `x86_64`, at API level 26
+- Static C++ runtime (`ANDROID_STL=c++_static`), OpenCV modules built as static
+  libraries and linked into one `libopencv_java4.so`
+- IPP-ICV, FastCV, ITT and OpenCL disabled
+- HALs: carotene on ARM, plus KleidiCV 0.3.0 on arm64. The build fails if the
+  HAL set differs from this, for example if the KleidiCV download failed.
+
+Toolchain: Android NDK r29 (`29.0.14206865`), the Android SDK CMake 3.31.5
+package (it includes ninja 1.10.2), and Python 3.12.15 for the bindings
+generator.
+
+## Reproducibility
+
+The output does not depend on where or when the build runs:
+
+- `-ffile-prefix-map` removes source, build and NDK paths.
+- `SOURCE_DATE_EPOCH` is set to the OpenCV commit time.
+- The configure summary OpenCV embeds in the library, and its sample-data
+  paths, are sanitised.
+- The libraries are stripped with the NDK's `llvm-strip`.
+
+`BUILD_MANIFEST.txt` in the output directory records the toolchain versions and
+the sha256 of each library. Two builds with the same inputs must produce the
+same hashes.
+
+## Using your own toolchain
 
 ```bash
-cmake \
-  -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
-  -DANDROID_ABI=$TARGET_ABI \
-  -DANDROID_PLATFORM=android-$API_LEVEL \
-  -DBUILD_LIST=core,imgproc,java \
-  -DBUILD_EXAMPLES=OFF \
-  -DBUILD_ANDROID_EXAMPLES=OFF \
-  -DBUILD_TESTS=OFF \
-  -DBUILD_PERF_TESTS=OFF \
-  -DBUILD_DOCS=OFF \
-  -DBUILD_opencv_java=ON \
-  -DBUILD_opencv_java_bindings_generator=ON \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DBUILD_SHARED_LIBS=OFF \
-  -DWITH_IPP=OFF \
-  -DWITH_IPP_A=OFF \
-  -DWITH_ITT=OFF \
-  -DWITH_TBB=OFF \
-  -DWITH_OPENCL=OFF \
-  ..
+scripts/build_opencv_android.sh \
+  --opencv-src /path/to/opencv \
+  --ndk /path/to/android-ndk-r29 \
+  --cmake /path/to/cmake-3.31.5 \
+  --python /path/to/python3 \
+  --out /tmp/opencv-out \
+  [--abi arm64-v8a ...] [--jobs N] [--download-cache DIR]
 ```
 
-This configuration tells OpenCV’s build system to compile only the selected modules and generate the Java bindings target (which will produce **libopencv_java4.so**).
+`ninja` must be on `PATH`. A different NDK, CMake or OpenCV version gives
+different binaries, so use the pinned versions above to match a release.
 
----
+## Java sources
 
-## 4. Build the Unified Java Library
-
-Invoke the build command to compile the **opencv_java** target:
-
-```bash
-cmake --build . --target opencv_java -j$(nproc)
-```
-
-After the build completes, the unified library (for **$TARGET_ABI**) should be generated—typically at a location like:
-
-```
-jni/$TARGET_ABI/libopencv_java4.so
-```
-
----
-
-## 5. Strip Unneeded Symbols
-
-Reduce the size of the generated library by stripping unneeded symbols using the NDK’s llvm-strip tool:
-
-```bash
-$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip --strip-unneeded jni/$TARGET_ABI/libopencv_java4.so
-```
-
----
-
-## 6. Using the Library in Your Android Project
-
-Copy the resulting **libopencv_java4.so** into your Android project’s JNI libraries folder (e.g. `app/src/main/jniLibs/$TARGET_ABI/`). Then, in your Java or Kotlin code, load the library as follows:
-
-```java
-static {
-    System.loadLibrary("opencv_java4");
-}
-```
+The Java sources in `openCV/src/main/java` are kept from earlier releases for
+API compatibility. They are a subset of OpenCV's generated bindings, and they
+include `imgcodecs` wrappers whose native side is **not** built, so calling
+them throws `UnsatisfiedLinkError`. The build generates a fresh copy under
+`<out>/java` for comparison, but the build does not use it.
