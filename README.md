@@ -1,5 +1,7 @@
 # Tiny-OpenCV
 
+[![JitPack](https://jitpack.io/v/Hazzatur/Tiny-OpenCV.svg)](https://jitpack.io/#Hazzatur/Tiny-OpenCV)
+
 > **Legacy, frozen.** `4.11.0-3` is the final release of Tiny-OpenCV. It will get
 > no further updates. [Document-Scanning-Android-SDK](https://github.com/Hazzatur/Document-Scanning-Android-SDK)
 > will build its own OpenCV from version 2.0 and will no longer depend on this library.
