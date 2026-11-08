@@ -1,8 +1,8 @@
 jdk:
   - openjdk17
-# One chained command: JitPack ignores failures in before_install, which would let
-# Gradle publish without freshly built native libraries.
-# The prepare script also fetches the wrapper's pinned Gradle (sha256-verified, with
-# mirrors), because the wrapper's single URL redirects to GitHub releases.
+# A single command: JitPack ignores failures in before_install, which would let Gradle
+# publish without freshly built native libraries. The prepare script builds the natives
+# from source, then runs the given task with a sha256-verified Gradle (the wrapper's only
+# download URL redirects to GitHub releases, which are not always reachable from JitPack).
 install:
-  - bash scripts/jitpack_prepare.sh && build/native-toolchain/gradle/bin/gradle :openCV:publishToMavenLocal
+  - bash scripts/jitpack_prepare.sh :openCV:publishToMavenLocal
