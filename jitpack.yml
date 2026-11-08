@@ -1,0 +1,6 @@
+jdk:
+  - openjdk17
+before_install:
+  - bash scripts/jitpack_prepare.sh
+install:
+  - ./gradlew :openCV:publishToMavenLocal
