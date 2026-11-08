@@ -51,6 +51,20 @@ OPENCV_COMMIT=31b0eeea0b44b370fd0712312df4214d4ae1b158
 
 verify() { echo "$2  $1" | sha256sum -c --quiet >/dev/null 2>&1; }
 
+# Fallback downloader using the pinned Python (OpenSSL 3), once it is unpacked. JitPack's
+# system curl uses an old gnutls without TLS 1.3, which some hosts (gitlab.arm.com) require.
+# Certificates are verified against the system CA store, as with curl.
+py_get() { # url out
+  [[ -x "$WORK/python/bin/python3" ]] || return 1
+  "$WORK/python/bin/python3" -I - "$1" "$2" <<'PY'
+import shutil, sys, urllib.request
+url, out = sys.argv[1], sys.argv[2]
+req = urllib.request.Request(url, headers={"User-Agent": "tiny-opencv-build"})
+with urllib.request.urlopen(req, timeout=60) as r, open(out, "wb") as f:
+    shutil.copyfileobj(r, f)
+PY
+}
+
 fetch() { # out sha256 url...
   local out="$1" sha="$2" i url; shift 2
   verify "$out" "$sha" && return 0
@@ -58,7 +72,7 @@ fetch() { # out sha256 url...
   for i in 1 2 3 4 5; do
     for url in "$@"; do
       rm -f "$out"
-      if curl -fsSL --connect-timeout 30 -o "$out" "$url" && verify "$out" "$sha"; then
+      if { curl -fsSL --connect-timeout 30 -o "$out" "$url" || py_get "$url" "$out"; } && verify "$out" "$sha"; then
         echo "    fetched $out from ${url%%\?*}"; return 0
       fi
       echo "    attempt $i failed: ${url%%\?*}" >&2
@@ -76,11 +90,11 @@ echo ">>> ANDROID_HOME=${ANDROID_HOME:-unset}; preinstalled NDKs: $(ls "${ANDROI
 fetch ndk.zip "$NDK_SHA256" "${NDK_URLS[@]}"
 fetch cmake.zip "$CMAKE_SHA256" "${CMAKE_URLS[@]}"
 fetch python.tar.gz "$PYTHON_SHA256" "${PYTHON_URLS[@]}"
+[[ -d python ]] || tar xzf python.tar.gz   # unpacked now so py_get can use it below
 fetch "$KLEIDICV_CACHE" "$KLEIDICV_SHA256" "${KLEIDICV_URLS[@]}"
 fetch gradle.zip "$GRADLE_SHA256" "${GRADLE_URLS[@]}"
 [[ -d android-ndk-r29 ]] || unzip -q ndk.zip
 [[ -d cmake-3.31.5 ]] || { mkdir cmake-3.31.5 && unzip -q cmake.zip -d cmake-3.31.5; }
-[[ -d python ]] || tar xzf python.tar.gz
 [[ -d "gradle-$GRADLE_VERSION" ]] || unzip -q gradle.zip
 ln -sfn "gradle-$GRADLE_VERSION" gradle
 export PATH="$WORK/cmake-3.31.5/bin:$PATH"   # provides ninja
