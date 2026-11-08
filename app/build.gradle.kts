@@ -19,7 +19,6 @@ android {
         externalNativeBuild {
             cmake {
                 abiFilters("x86", "x86_64", "armeabi-v7a", "arm64-v8a")
-                arguments("-DOpenCV_DIR=${projectDir.absolutePath}/../openCV440/src/main/jniLibs")
                 targets("opencv_jni_shared")
             }
         }

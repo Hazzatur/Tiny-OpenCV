@@ -2,12 +2,17 @@
 # Fetches the pinned, checksum-verified toolchain + OpenCV source and builds the native
 # libraries into openCV/src/main/jniLibs. Used by jitpack.yml; also runnable locally.
 #
+# Usage: scripts/jitpack_prepare.sh [GRADLE_TASK...]
+#   Any arguments are run as Gradle tasks afterwards, using the verified Gradle download.
+#   WORK (default ~/.cache/tiny-opencv-native) holds the toolchain; it is kept outside the
+#   repository so JitPack does not pick up OpenCV's own pom.xml as an artifact.
+#
 # The committed jniLibs are deleted first, so a failure here can never lead to the old
 # prebuilt binaries being published.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-WORK="${WORK:-$ROOT/build/native-toolchain}"
+WORK="${WORK:-$HOME/.cache/tiny-opencv-native}"
 JNILIBS="$ROOT/openCV/src/main/jniLibs"
 rm -rf "$JNILIBS"
 mkdir -p "$WORK"; cd "$WORK"
@@ -96,3 +101,8 @@ echo ">>> toolchain ready in $(( $(date +%s) - t0 ))s"
 
 cp -r "$WORK/out/jniLibs" "$JNILIBS"
 echo ">>> native build finished in $(( $(date +%s) - t0 ))s total"
+
+if [[ $# -gt 0 ]]; then
+  cd "$ROOT"
+  exec "$WORK/gradle/bin/gradle" "$@"
+fi

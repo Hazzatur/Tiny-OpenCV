@@ -145,6 +145,7 @@ for ABI in "${ABIS[@]}"; do
     -DBUILD_TESTS=OFF -DBUILD_PERF_TESTS=OFF -DBUILD_DOCS=OFF \
     -DBUILD_opencv_apps=OFF \
     -DWITH_IPP=OFF -DWITH_FASTCV=OFF -DWITH_OPENCL=OFF \
+    -DWITH_ITT=OFF \
     -DOPENCV_ENABLE_NONFREE=OFF \
     > "$BDIR/configure.log" 2>&1 || { tail -40 "$BDIR/configure.log"; die "configure failed for $ABI"; }
   sanitize_build_info "$BDIR"

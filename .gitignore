@@ -33,3 +33,6 @@ google-services.json
 *.hprof
 
 .kotlin
+
+# Native libraries are built from source by scripts/build_opencv_android.sh
+openCV/src/main/jniLibs/
