@@ -29,6 +29,17 @@ PYTHON_SHA256=5d546fc004fc2435fa142eb8f42ed8de5eb4725963dc22f7e6671014a80eb560
 KLEIDICV_URLS=(https://gitlab.arm.com/kleidi/kleidicv/-/archive/0.3.0/kleidicv-0.3.0.tar.gz)
 KLEIDICV_SHA256=7ac74f74b4e7cd9cd6b4d9c77ec2aa6fcabd3271e61051efd8ac95c1a5a5fabb
 KLEIDICV_CACHE=downloads/kleidicv/51a77b0185c2bac2a968a2163869b1ed-kleidicv-0.3.0.tar.gz
+# Gradle: the version pinned by the wrapper, verified against its distributionSha256Sum.
+# services.gradle.org redirects to GitHub releases; the other two serve the file directly.
+WRAPPER_PROPS="$ROOT/gradle/wrapper/gradle-wrapper.properties"
+GRADLE_VERSION="$(sed -n 's/^distributionUrl=.*gradle-\([0-9.]*\)-bin\.zip$/\1/p' "$WRAPPER_PROPS")"
+GRADLE_SHA256="$(sed -n 's/^distributionSha256Sum=//p' "$WRAPPER_PROPS")"
+[[ -n "$GRADLE_VERSION" && -n "$GRADLE_SHA256" ]] || { echo "error: cannot read Gradle pin from $WRAPPER_PROPS" >&2; exit 1; }
+GRADLE_URLS=(
+  "https://services.gradle.org/distributions/gradle-$GRADLE_VERSION-bin.zip"
+  "https://downloads.gradle.org/distributions/gradle-$GRADLE_VERSION-bin.zip"
+  "https://mirrors.cloud.tencent.com/gradle/gradle-$GRADLE_VERSION-bin.zip"
+)
 OPENCV_REPO=https://github.com/opencv/opencv.git
 OPENCV_TAG=4.11.0
 OPENCV_COMMIT=31b0eeea0b44b370fd0712312df4214d4ae1b158
@@ -61,9 +72,12 @@ fetch ndk.zip "$NDK_SHA256" "${NDK_URLS[@]}"
 fetch cmake.zip "$CMAKE_SHA256" "${CMAKE_URLS[@]}"
 fetch python.tar.gz "$PYTHON_SHA256" "${PYTHON_URLS[@]}"
 fetch "$KLEIDICV_CACHE" "$KLEIDICV_SHA256" "${KLEIDICV_URLS[@]}"
+fetch gradle.zip "$GRADLE_SHA256" "${GRADLE_URLS[@]}"
 [[ -d android-ndk-r29 ]] || unzip -q ndk.zip
 [[ -d cmake-3.31.5 ]] || { mkdir cmake-3.31.5 && unzip -q cmake.zip -d cmake-3.31.5; }
 [[ -d python ]] || tar xzf python.tar.gz
+[[ -d "gradle-$GRADLE_VERSION" ]] || unzip -q gradle.zip
+ln -sfn "gradle-$GRADLE_VERSION" gradle
 export PATH="$WORK/cmake-3.31.5/bin:$PATH"   # provides ninja
 
 if [[ ! -d opencv ]]; then
