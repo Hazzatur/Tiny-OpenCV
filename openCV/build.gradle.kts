@@ -82,7 +82,7 @@ afterEvaluate {
                 from(components["release"])
                 groupId = "com.github.hazzatur"
                 artifactId = "Tiny-OpenCV"
-                version = System.getenv("VERSION") ?: "4.11.0-3"
+                version = System.getenv("VERSION") ?: "4.11.0-4"
             }
         }
     }

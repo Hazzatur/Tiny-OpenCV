@@ -2,7 +2,7 @@
 
 [![JitPack](https://jitpack.io/v/Hazzatur/Tiny-OpenCV.svg)](https://jitpack.io/#Hazzatur/Tiny-OpenCV)
 
-> **Legacy, frozen.** `4.11.0-3` is the final release of Tiny-OpenCV. It will get
+> **Legacy, frozen.** `4.11.0-4` is the final release of Tiny-OpenCV. It will get
 > no further updates. [Document-Scanning-Android-SDK](https://github.com/Hazzatur/Document-Scanning-Android-SDK)
 > will build its own OpenCV from version 2.0 and will no longer depend on this library.
 > Existing versions remain available on JitPack.
@@ -24,7 +24,7 @@ In your app's Gradle file:
 
     dependencies {
         ...
-        implementation 'com.github.Hazzatur:Tiny-OpenCV:4.11.0-3'
+        implementation 'com.github.Hazzatur:Tiny-OpenCV:4.11.0-4'
     }
 
 In your root Gradle file:
@@ -42,7 +42,7 @@ Load the library before using any OpenCV class:
 System.loadLibrary("opencv_java4")
 ```
 
-`4.11.0-3` is a drop-in replacement for `4.11.0-2`: it has the same Java API, the
+`4.11.0-4` is a drop-in replacement for `4.11.0-2`: it has the same Java API, the
 same exported JNI functions and the same set of native libraries. The only additions are
 the license notices under `META-INF/tiny-opencv/`. Only how the native libraries
 are produced has changed.
