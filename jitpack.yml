@@ -1,6 +1,6 @@
 jdk:
   - openjdk17
-before_install:
-  - bash scripts/jitpack_prepare.sh
+# One chained command: JitPack ignores failures in before_install, which would let
+# Gradle publish without freshly built native libraries.
 install:
-  - ./gradlew :openCV:publishToMavenLocal
+  - bash scripts/jitpack_prepare.sh && ./gradlew :openCV:publishToMavenLocal

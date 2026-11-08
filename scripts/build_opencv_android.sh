@@ -5,7 +5,7 @@
 # Usage:
 #   scripts/build_opencv_android.sh --opencv-src DIR --ndk DIR --out DIR \
 #       [--cmake DIR_WITH_BIN] [--abi ABI]... [--build-root DIR] [--jobs N] \
-#       [--download-cache DIR]
+#       [--download-cache DIR] [--python PYTHON3]
 #
 # Defaults: all four ABIs, build root = <out>/.build, jobs = nproc.
 # Output layout:
@@ -23,7 +23,7 @@
 #   * proprietary/binary-blob options are forced off (IPP-ICV, FastCV)
 set -euo pipefail
 
-OPENCV_SRC="" NDK="" OUT="" CMAKE_DIR="" BUILD_ROOT="" JOBS="$(nproc)" DL_CACHE=""
+OPENCV_SRC="" NDK="" OUT="" CMAKE_DIR="" BUILD_ROOT="" JOBS="$(nproc)" DL_CACHE="" PYTHON=""
 ABIS=()
 API_LEVEL=26
 
@@ -39,6 +39,7 @@ while [[ $# -gt 0 ]]; do
     --build-root) BUILD_ROOT="$2"; shift 2 ;;
     --jobs) JOBS="$2"; shift 2 ;;
     --download-cache) DL_CACHE="$2"; shift 2 ;;
+    --python) PYTHON="$2"; shift 2 ;;
     -h|--help) sed -n '2,25p' "$0"; exit 0 ;;
     *) die "unknown argument: $1" ;;
   esac
@@ -58,7 +59,9 @@ DL_CACHE="${DL_CACHE:-$BUILD_ROOT/downloads}"; mkdir -p "$DL_CACHE"; DL_CACHE="$
 if [[ -n "$CMAKE_DIR" ]]; then CMAKE="$(realpath "$CMAKE_DIR")/bin/cmake"; else CMAKE="$(command -v cmake)"; fi
 [[ -x "$CMAKE" ]] || die "cmake not found"
 command -v ninja >/dev/null || die "ninja not found"
-command -v python3 >/dev/null || die "python3 not found (needed by the Java bindings generator)"
+PYTHON="${PYTHON:-$(command -v python3 || true)}"
+[[ -n "$PYTHON" && -x "$PYTHON" ]] || die "python3 not found (needed by the Java bindings generator)"
+PYTHON="$(realpath "$PYTHON")"
 STRIP="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
 
 OPENCV_COMMIT="$(git -C "$OPENCV_SRC" rev-parse HEAD 2>/dev/null || echo unknown)"
@@ -66,15 +69,18 @@ if [[ -z "${SOURCE_DATE_EPOCH:-}" ]]; then
   SOURCE_DATE_EPOCH="$(git -C "$OPENCV_SRC" log -1 --format=%ct 2>/dev/null || echo 0)"
 fi
 export SOURCE_DATE_EPOCH
-export LC_ALL=C TZ=UTC
+# PYTHONHASHSEED: keeps the bindings generator's set/dict iteration order stable.
+export LC_ALL=C TZ=UTC PYTHONHASHSEED=0
 NDK_REV="$(sed -n 's/^Pkg.Revision *= *//p' "$NDK/source.properties")"
 CMAKE_VER="$("$CMAKE" --version | head -1 | awk '{print $3}')"
+PYTHON_VER="$("$PYTHON" -c 'import platform; print(platform.python_version())')"
+NINJA_VER="$(ninja --version)"
 
 sanitize_build_info() {
   # $1 = build dir. Rewrites the configure summary compiled into libopencv_core.
   local inc="$1/modules/core/version_string.inc"
   [[ -f "$inc" ]] || die "version_string.inc not found in $1"
-  python3 -I - "$inc" "$NDK" "$OPENCV_SRC" "$1" "$CMAKE" "$(command -v python3)" "$(command -v ninja)" <<'PY'
+  "$PYTHON" -I - "$inc" "$NDK" "$OPENCV_SRC" "$1" "$CMAKE" "$PYTHON" "$(command -v ninja)" <<'PY'
 import re, sys
 path, ndk, src, bld, cmake, py, ninja = sys.argv[1:]
 s = open(path, encoding="utf-8").read()
@@ -90,7 +96,7 @@ PY
   # but they embed the absolute build dir and the build->source relative path.
   local dcfg="$1/opencv_data_config.hpp"
   [[ -f "$dcfg" ]] || die "opencv_data_config.hpp not found in $1"
-  python3 -I - "$dcfg" <<'PY'
+  "$PYTHON" -I - "$dcfg" <<'PY'
 import re, sys
 p = sys.argv[1]
 s = open(p, encoding="utf-8").read()
@@ -105,6 +111,8 @@ MANIFEST="$OUT/BUILD_MANIFEST.txt"
   echo "opencv_commit=$OPENCV_COMMIT"
   echo "ndk_revision=$NDK_REV"
   echo "cmake_version=$CMAKE_VER"
+  echo "ninja_version=$NINJA_VER"
+  echo "python_version=$PYTHON_VER"
   echo "android_api=$API_LEVEL"
   echo "source_date_epoch=$SOURCE_DATE_EPOCH"
 } > "$MANIFEST"
@@ -125,6 +133,8 @@ for ABI in "${ABIS[@]}"; do
     -DCMAKE_C_FLAGS="$PREFIX_MAP" \
     -DCMAKE_CXX_FLAGS="$PREFIX_MAP" \
     -DOPENCV_DOWNLOAD_PATH="$DL_CACHE" \
+    -DPYTHON_DEFAULT_EXECUTABLE="$PYTHON" \
+    -DPYTHON3_EXECUTABLE="$PYTHON" \
     -DCMAKE_INSTALL_PREFIX=/opencv-install \
     -DBUILD_LIST=core,imgproc,java,java_bindings_generator \
     -DANDROID_PROJECTS_BUILD_TYPE=GRADLE \
